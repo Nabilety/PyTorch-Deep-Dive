@@ -156,3 +156,90 @@ with torch.no_grad():
 # After this regression project, we will now work on a classification project
 
 # ## Project two - classifying MNIST hand-written digits
+
+# We will categorize MNIST handwritten digits, where we repeat the four essentia steps
+# for ML in PyTorch, as we did in previous section. First we will load MNIST dataset from torchvision module
+
+# Step 1: Load dataset and specify hyperparameters (size of train set, test set and size of mini-batches)
+import torchvision
+from torchvision import transforms
+
+image_patch = './'
+transform = transforms.Compose([transforms.ToTensor()])
+
+mnist_train_dataset = torchvision.datasets.MNIST(root=image_patch,
+                                                 train=True,
+                                                 transform=transform,
+                                                 download=True)
+
+mnist_test_dataset = torchvision.datasets.MNIST(root=image_patch,
+                                                train=False,
+                                                transform=transform,
+                                                download=False)
+# here we construct a data loader with batches of 64 samples
+# Next, we will preprocess the loaded datasets.
+batch_size = 64
+torch.manual_seed(1)
+train_dl = DataLoader(mnist_train_dataset, batch_size, shuffle=True)
+
+# Step 2: Preprocess the input features and the labels.
+# Features in this project are pixels of the images we read from Step 1
+# We defined a custom transformation using torchvision.transforms.Compose.
+# In this simple case, our transformation consisted only of one method ToTensor().
+# The ToTensor() method converts the pixel features into a floating type tensor and
+# also normalizes the pixels from  the range [0, 255] to [0, 1].
+# Labels are integers from 0 to 9 representing ten digits. Hence, we don't need any scaling or further conversion.
+# Note we can access raw pixels using the data attribute, and don't forget to scale them to the range [0, 1]
+# We will construct the model in the next step once the data is preprocessed.
+
+
+# Step 3: Construct the NN model
+hidden_units = [32, 16]
+image_size = mnist_train_dataset[0][0].shape
+input_size = image_size[0] * image_size[1] * image_size[2]
+
+all_layers = [nn.Flatten()]
+for hidden_unit in hidden_units:
+    layer = nn.Linear(input_size, hidden_unit)
+    all_layers.append(layer)
+    all_layers.append(nn.ReLU())
+    input_size = hidden_unit
+
+all_layers.append(nn.Linear(hidden_units[-1], 10))
+model = nn.Sequential(*all_layers)
+print(model)
+
+# note model starts with a flatten layer that flattens the input image into one-dimensional tensor.
+# This is because the input images are in the shape of [1, 28, 28]. The model has two hiddden layers with 32 and 16 units
+# And it ends with an output layer of 10 units representing ten classes activated by a softmax function.
+
+# Use model for training evaluation and prediction
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+torch.manual_seed(1)
+num_epochs = 20
+for epoch in range(num_epochs):
+    accuracy_hist_train = 0
+    for x_batch, y_batch in train_dl:
+        pred = model(x_batch)
+        loss = loss_fn(pred, y_batch)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        is_correct = (torch.argmax(pred, dim=1) == y_batch).float()
+        accuracy_hist_train += is_correct.sum()
+    accuracy_hist_train /= len(train_dl.dataset)
+    print(f'Epoch {epoch}  Accuracy {accuracy_hist_train:.4f}')
+
+
+# We used the cross-entropy loss function for multiclass classification and the Adam optimizer
+# for gradient descent. We will talk about the Adam optimizer in Chapter 14. We trained the model
+# for 20 epochs and displayed the train accuracy for every epoch. The trained model reached an
+# accuracy of 96.3 percent on the training set and we will evaluate it on the testing set:
+
+pred = model(mnist_test_dataset.data / 255.)
+is_correct = (torch.argmax(pred, dim=1) == mnist_test_dataset.targets).float()
+print(f'Test accuracy: {is_correct.mean():.4f}')
+
+#T he test accuracy is 95.6 percent. You have learned how to solve a classification problem using PyTorch.
